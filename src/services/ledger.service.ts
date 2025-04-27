@@ -9,11 +9,12 @@ import type { IOutput } from "../interfaces/output.interface";
 
 //
 import LedgerModal from "../modals/ledger.modal";
+import type { IDatabaseAdapter } from "../interfaces/database.interface";
 
 //
-const creditAddress = async (output: IOutput, blockId: string, height: number, txId: string, OutputPosition: number, client: PoolClient): Promise<IResponse<string>> => {
+const creditAddress = async (output: IOutput, blockId: string, height: number, txId: string, OutputPosition: number, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   try {
-    await LedgerModal.creditAddress(output.address, output.value, blockId, height, txId, OutputPosition, client);
+    await LedgerModal.creditAddress(output.address, output.value, blockId, height, txId, OutputPosition, databaseAdapter);
 
     return {
       success: true,
@@ -29,9 +30,9 @@ const creditAddress = async (output: IOutput, blockId: string, height: number, t
 }
 
 //
-const debitAddress = async (output: IOutput, blockId: string, height: number, txId: string, inputPosition: number, client: PoolClient): Promise<IResponse<string>> => {
+const debitAddress = async (output: IOutput, blockId: string, height: number, txId: string, inputPosition: number, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   try {
-    await LedgerModal.debitAddress(output.address, output.value, blockId, height, txId, inputPosition, client);
+    await LedgerModal.debitAddress(output.address, output.value, blockId, height, txId, inputPosition, databaseAdapter);
 
     return {
       success: true,
@@ -74,10 +75,10 @@ const getBalanceByAddress = async (address: string): Promise<IResponse<string | 
 }
 
 //
-const deleteByHeight = async (height: number, client: PoolClient): Promise<IResponse<string>> => {
+const deleteByHeight = async (height: number, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   try {
 
-    await LedgerModal.deleteByHeight(height, client);
+    await LedgerModal.deleteByHeight(height, databaseAdapter);
 
     return {
       success: true,

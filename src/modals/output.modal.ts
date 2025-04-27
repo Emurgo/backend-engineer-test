@@ -4,6 +4,7 @@ import Dbclient from "../utilities/database/client"
 //
 import type { IOutput } from "../interfaces/output.interface"
 import type { IInput } from "../interfaces/input.interface";
+import type { IDatabaseAdapter } from "../interfaces/database.interface";
 
 //
 const getUnspentOutputsByTransactionInput = async (input: IInput): Promise<IOutput> => {
@@ -28,13 +29,13 @@ const getUnspentOutputsByTransactionInput = async (input: IInput): Promise<IOutp
 }
 
 //
-const createUnspentOutput = async (blockId: string, height: number, txId: string, outputPosition: number, output: IOutput, client: PoolClient): Promise<void> => {
+const createUnspentOutput = async (blockId: string, height: number, txId: string, outputPosition: number, output: IOutput, databaseAdapter: IDatabaseAdapter): Promise<void> => {
   const query = `
     INSERT INTO outputs (block_id, height, transaction_id, index, address, value)
     VALUES ($1, $2, $3, $4, $5, $6)
   `;
   const params = [blockId, height, txId, outputPosition, output.address, output.value];
-  const result = await client.query(query, params);
+  const result = await databaseAdapter.query(query, params);
 
   if (result.rowCount === 0) {
     throw new Error(`Transaction ID ${txId} with index ${outputPosition} already exists`);
@@ -42,7 +43,7 @@ const createUnspentOutput = async (blockId: string, height: number, txId: string
 }
 
 //
-const updateUnSpentOutput = async (blockId: string, height: number, input: IInput, txId: string, client: PoolClient): Promise<IOutput> => {
+const updateUnSpentOutput = async (blockId: string, height: number, input: IInput, txId: string, databaseAdapter: IDatabaseAdapter): Promise<IOutput> => {
   // Lock the output record for the current input
   const lockQuery = `
     SELECT *
@@ -50,7 +51,7 @@ const updateUnSpentOutput = async (blockId: string, height: number, input: IInpu
     WHERE transaction_id = $1 AND index = $2 AND spent_in_height IS NULL
     FOR UPDATE;
   `;
-  const lockResult = await client.query(lockQuery, [input.txId, input.index]);
+  const lockResult = await databaseAdapter.query(lockQuery, [input.txId, input.index]);
   
   // If no rows returned, cannot lock the record
   if (lockResult.rowCount === 0) {
@@ -65,7 +66,7 @@ const updateUnSpentOutput = async (blockId: string, height: number, input: IInpu
       spent_in_height = $2
     WHERE transaction_id = $3 AND index = $4 AND spent_in_height IS NULL;
   `;
-  const updateResult = await client.query(updateQuery, [blockId, height, input.txId, input.index]);
+  const updateResult = await databaseAdapter.query(updateQuery, [blockId, height, input.txId, input.index]);
 
   // If no rows were updated, it means the condition was not met
   if (updateResult.rowCount === 0) {
@@ -80,7 +81,7 @@ const updateUnSpentOutput = async (blockId: string, height: number, input: IInpu
 }
 
 //
-const deleteOutputs = async (height: number, client: PoolClient): Promise<void> => {
+const deleteOutputs = async (height: number, databaseAdapter: IDatabaseAdapter): Promise<void> => {
   //
   const params =  [height];
   const deleteQuery = `
@@ -89,7 +90,7 @@ const deleteOutputs = async (height: number, client: PoolClient): Promise<void> 
     WHERE
       height > $1
   `
-  const deleteResult = await client.query(deleteQuery, params);
+  const deleteResult = await databaseAdapter.query(deleteQuery, params);
   if (deleteResult.rowCount === 0) {
     throw new Error(`Failed to delete outputs with height greater than ${height}`);
   }
@@ -102,7 +103,7 @@ const deleteOutputs = async (height: number, client: PoolClient): Promise<void> 
     WHERE
       spent_in_height > $1
   `;
-  const updateResult = await client.query(updateQuery, params);
+  const updateResult = await databaseAdapter.query(updateQuery, params);
   if (updateResult.rowCount === 0) {
     throw new Error(`Failed to update outputs with spent_in_height greater than ${height}`);
   }

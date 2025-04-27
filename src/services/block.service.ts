@@ -7,6 +7,7 @@ import Logger from '../utilities/logger';
 import type { IBlock } from "../interfaces/block.interface";
 import type { IResponse } from "../interfaces/response.interface";
 import type { IOutput } from "../interfaces/output.interface";
+import type { IDatabaseAdapter } from "../interfaces/database.interface";
 
 //
 import TransactionService from "../services/transaction.service";
@@ -109,83 +110,82 @@ const getCurrentHeight = async (): Promise<IResponse<string | number>> => {
 }
 
 //
-const createBlock = async (block: IBlock): Promise<IResponse<string>> => {
+const createBlock = async (block: IBlock, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   //
-  const pool: Pool = Dbclient.get();
-  // get a connection from the pool to use for db_transaction
-  const client: PoolClient = await pool.connect();
-
   const { id: blockId, height, transactions } = block;
+  let transactionStarted = false;
 
   //
   try {
     //
-    await client.query ("BEGIN");
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [parseInt(process.env.LOCK_KEY ?? "12345")]);
+    await databaseAdapter.beginTransaction();
+    transactionStarted = true;
 
     for(const txn of transactions) {
       // create transactions
-      const createTransactionResult = await TransactionService.createTransaction(blockId, height, txn, client);
+      const createTransactionResult = await TransactionService.createTransaction(blockId, height, txn, databaseAdapter);
       if (!createTransactionResult.success) {
         throw new Error(createTransactionResult.response ?? 'Failed to create transaction');
       }
     }
 
     // insert block
-    await BlockModal.createBlock(block, client);
+    await BlockModal.createBlock(block, databaseAdapter);
 
-    await client.query("COMMIT");
+    await databaseAdapter.commitTransaction();
 
     return {
       success: true,
       response: "Block Created successfully",
     }
   } catch (error: any) {
-    await client.query("ROLLBACK");
+    if (transactionStarted) {
+      await databaseAdapter.rollbackTransaction();
+    }
     Logger.error(error.message ?? 'Unknown Error', error);
     return {
       success: false,
       response: error?.message ?? "Unknown error occurred while creating block",
     }
   } finally {
-    client.release();
+    await databaseAdapter.releaseTransaction();
   }
 }
 
 //
-const rollback = async (height: number): Promise<IResponse<string>> => {
+const rollback = async (height: number, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   //
-  const pool: Pool = Dbclient.get();
-  const client: PoolClient = await pool.connect();
+  let transactionStarted = false;
 
   try {
     //
-    await client.query ("BEGIN");
-    await client.query(`SELECT pg_advisory_xact_lock($1)`, [parseInt(process.env.LOCK_KEY ?? "12345")]);
+    await databaseAdapter.beginTransaction();
 
     //
-    const deleteTransactionResult = await TransactionService.deleteTransactions(height, client);
+    const deleteTransactionResult = await TransactionService.deleteTransactions(height, databaseAdapter);
     if (!deleteTransactionResult.success) {
       throw new Error(deleteTransactionResult.response ?? 'Failed to delete transaction')
     }
 
-    await BlockModal.deleteBlock(height, client);
+    await BlockModal.deleteBlock(height, databaseAdapter);
 
     //
-    await client.query("COMMIT");
+    await databaseAdapter.commitTransaction();
     return {
       success: true,
       response: `Height rollback to ${height}`
     }
   } catch (error: any) {
-    await client.query("ROLLBACK");
+    if (transactionStarted) {
+      await databaseAdapter.rollbackTransaction();
+    }
     Logger.error(error.message ?? 'Unknown Error', error);
     return {
       success: false,
       response: error?.message ?? "Unknown error occurred while creating block",
     }
   } finally {
-    client.release();
+    await databaseAdapter.releaseTransaction();
   }
 }
 
