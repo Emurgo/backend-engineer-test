@@ -5,6 +5,7 @@ import Logger from "../utilities/logger";
 import type { IOutput } from "../interfaces/output.interface";
 import type { ITransaction } from "../interfaces/transaction.interface";
 import type { IResponse } from "../interfaces/response.interface";
+import type { IDatabaseAdapter } from "../interfaces/database.interface";
 
 import TransactionModal from "../modals/transaction.modal";
 import OutputService from "../services/output.service";
@@ -77,11 +78,11 @@ const isCoinbaseTransaction = async (transaction: ITransaction): Promise<boolean
 }
 
 //
-const createTransaction = async (blockId: string, height: number, txn: ITransaction, client: PoolClient): Promise<IResponse<string>> => {
+const createTransaction = async (blockId: string, height: number, txn: ITransaction, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   //
   try {
     // Update outputs to spent
-    const updateOutputRes = await OutputService.updateSpentOutputs(blockId, height, txn.id, txn.inputs, client);
+    const updateOutputRes = await OutputService.updateSpentOutputs(blockId, height, txn.id, txn.inputs, databaseAdapter);
     if (!updateOutputRes.success) {
       return {
         success: false,
@@ -90,7 +91,7 @@ const createTransaction = async (blockId: string, height: number, txn: ITransact
     }
 
     // Create unspent outputs
-    const createOutputRes = await OutputService.createUnspentOutputs(blockId, height, txn.id, txn.outputs, client);
+    const createOutputRes = await OutputService.createUnspentOutputs(blockId, height, txn.id, txn.outputs, databaseAdapter);
     if (!createOutputRes.success) {
       return {
         success: false,
@@ -99,7 +100,7 @@ const createTransaction = async (blockId: string, height: number, txn: ITransact
     }
 
     // Create the transaction
-    await TransactionModal.createTransaction(blockId, height, txn.id, client);
+    await TransactionModal.createTransaction(blockId, height, txn.id, databaseAdapter);
 
     return {
       success: true,
@@ -115,9 +116,9 @@ const createTransaction = async (blockId: string, height: number, txn: ITransact
 }
 
 //
-const deleteTransactions = async (height: number, client: PoolClient): Promise<IResponse<string>> => {
+const deleteTransactions = async (height: number, databaseAdapter: IDatabaseAdapter): Promise<IResponse<string>> => {
   try {
-    const deleteOutputsResult = await OutputService.deleteOutputs(height, client);
+    const deleteOutputsResult = await OutputService.deleteOutputs(height, databaseAdapter);
     if (!deleteOutputsResult.success) {
       return {
         success: false,
@@ -125,7 +126,7 @@ const deleteTransactions = async (height: number, client: PoolClient): Promise<I
       }
     }
 
-    await TransactionModal.deleteTransactions(height, client);
+    await TransactionModal.deleteTransactions(height, databaseAdapter);
 
     return {
       success: true,

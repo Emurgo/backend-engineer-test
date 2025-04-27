@@ -3,15 +3,16 @@ import DbClient from "../utilities/database/client";
 
 //
 import type { IBlock } from '../interfaces/block.interface';
+import type { IDatabaseAdapter } from '../interfaces/database.interface';
 
 //
-const createBlock = async (block: IBlock, client: PoolClient): Promise<void> => {
+const createBlock = async (block: IBlock, databaseAdapter: IDatabaseAdapter): Promise<void> => {
   //
   if (block.height > 0) {
     const updateQuery = `
       UPDATE blocks SET is_tip = false WHERE is_tip = true;
     `;
-    const updateResult = await client.query(updateQuery);
+    const updateResult = await databaseAdapter.query(updateQuery);
     if (updateResult.rowCount === 0) {
       throw new Error(`Failed to update ${block.id}`);
     }
@@ -22,7 +23,7 @@ const createBlock = async (block: IBlock, client: PoolClient): Promise<void> => 
     VALUES ($1, $2, $3, true);
   `;
   const params = [block.id, block.height, block];
-  const result = await client.query(insertQuery, params);
+  const result = await databaseAdapter.query(insertQuery, params);
 
   if (result.rowCount === 0) {
     throw new Error(`Block with ID ${block.id} already exists`);
@@ -54,7 +55,7 @@ const getCurrentHeight = async (isGenesis: boolean = false): Promise<number | nu
 }
 
 //
-const deleteBlock = async (height: number, client: PoolClient): Promise<void> => {
+const deleteBlock = async (height: number, databaseAdapter: IDatabaseAdapter): Promise<void> => {
   //
   const params = [height];
 
@@ -67,7 +68,7 @@ const deleteBlock = async (height: number, client: PoolClient): Promise<void> =>
     WHERE
       height > $1
   `;
-  const deleteResult = await client.query(deleteBlocksQuery, params);
+  const deleteResult = await databaseAdapter.query(deleteBlocksQuery, params);
   if (deleteResult.rowCount === 0) {
     throw new Error(`Failed to delete blocks with height greater than ${height}`);
   }
@@ -79,7 +80,7 @@ const deleteBlock = async (height: number, client: PoolClient): Promise<void> =>
     WHERE 
       height = $1
   `;
-  const setResult = await client.query(setBlockTipQuery, params);
+  const setResult = await databaseAdapter.query(setBlockTipQuery, params);
   if (setResult.rowCount === 0) {
     throw new Error(`Failed to set block with height ${height} as tip`);
   }

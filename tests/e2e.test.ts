@@ -30,24 +30,29 @@ describe ('E2E Tests', () => {
     testDBName = `e2e_test_db_${randomUUID().substring(0, 6)}`;
     await DbClient.init(testDbUrl, testDBName);
     await Migrations.run();
+
+    process.env.DATABASE_URL = testDbUrl;
+    process.env.DB_NAME = testDBName;
   });
 
   //
   afterAll(async () => {
     // terminate all connections to the test database
     const pool = DbClient.get();
-    await pool.query(`
-      SELECT pg_terminate_backend(pg_stat_activity.pid)
-      FROM pg_stat_activity
-      WHERE pg_stat_activity.datname = '${testDBName}'
-        AND pid <> pg_backend_pid();
-    `);
     await pool.end();
 
     // Use the default database for dropping
     const defaultPool = new Pool({
       connectionString: `${testDbUrl}/postgres`,
     });
+
+    await defaultPool.query(`
+      SELECT pg_terminate_backend(pg_stat_activity.pid)
+      FROM pg_stat_activity
+      WHERE pg_stat_activity.datname = '${testDBName}'
+        AND pid <> pg_backend_pid();
+    `);
+
     await defaultPool.query('DROP TABLE IF EXISTS blocks, transactions, inputs, outputs, ledgers;');
     await defaultPool.query(`DROP DATABASE IF EXISTS ${testDBName};`);
     await defaultPool.end();

@@ -1,8 +1,10 @@
 //
 import type { FastifyRequest, FastifyReply } from "fastify";
+import type { Pool, PoolClient } from "pg";
 
 //
 import Logger from '../utilities/logger';
+import { PostgresAdapter } from "../utilities/database/postgres.adapter";
 
 //
 import type { IBlock } from "../interfaces/block.interface";
@@ -13,6 +15,7 @@ import LedgerService from "../services/ledger.service";
 
 //
 const	createBlock = async (req: FastifyRequest, res: FastifyReply) => {
+  let databaseAdapter = null;
   try {
     //
     const block = req.body as IBlock;
@@ -25,9 +28,11 @@ const	createBlock = async (req: FastifyRequest, res: FastifyReply) => {
         message: validationResult.response
       })
     }
-    
+
+    databaseAdapter = new PostgresAdapter();
+
     // check if the block is valid
-    const blockCreateResult =	await BlockService.createBlock(block);
+    const blockCreateResult =	await BlockService.createBlock(block, databaseAdapter);
     if (!blockCreateResult.success) {
       Logger.error(blockCreateResult.response);
       return res.status(400).send({
@@ -45,6 +50,8 @@ const	createBlock = async (req: FastifyRequest, res: FastifyReply) => {
     res.status(500).send({
       message: error?.message ?? "Internal Server Error"
     });
+  } finally {
+    await databaseAdapter?.end();
   }
 }
 
@@ -81,6 +88,7 @@ const getBalanceByAddress = async (req: FastifyRequest, res: FastifyReply) => {
 
 //
 const rollback = async (req: FastifyRequest, res: FastifyReply) => {
+  let databaseAdapter = null;
   try {
     // Extract the height parameter from the query string
     const { height } = req.query as { height?: string };
@@ -95,8 +103,10 @@ const rollback = async (req: FastifyRequest, res: FastifyReply) => {
     // Convert height to a number
     const heightNumber = Number(height);
 
+    databaseAdapter = new PostgresAdapter();
+
     // Perform rollback logic here (e.g., call a service)
-    const result = await BlockService.rollback(heightNumber);
+    const result = await BlockService.rollback(heightNumber, databaseAdapter);
     if (!result.success) {
       Logger.error(result.response);
       return res.status(400).send({
@@ -112,6 +122,8 @@ const rollback = async (req: FastifyRequest, res: FastifyReply) => {
     res.status(500).send({
       message: "Internal Server Error",
     });
+  } finally {
+    await databaseAdapter?.end();
   }
 }
 
