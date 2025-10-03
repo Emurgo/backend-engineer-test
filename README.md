@@ -20,7 +20,7 @@ https://docs.docker.com/compose/install/
 Once you have `docker` and `docker-compose` installed, you can run the following command to start the application:
 
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 or using `Bun`
