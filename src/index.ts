@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { randomUUID } from 'crypto';
 
-const fastify = Fastify({ logger: true });
+const fastify = Fastify({ logger: true, maxParamLength: 200 });
 
 fastify.get('/', async (request, reply) => {
   return { hello: 'world' };
@@ -73,6 +73,31 @@ async function createTables(pool: Pool) {
   `);
 }
 
+// GET /balance/:address
+fastify.get('/balance/:address', async (request, reply) => {
+  const { address } = request.params;
+
+  try {
+    const result = await fastify.pool.query(
+      `SELECT balance FROM balances WHERE address = $1`,
+      [address]
+    );
+
+    if (result.rows.length === 0) {
+      return reply
+        .status(404)
+        .send({ error: 'Address not found', address: address });
+    }
+
+    return {
+      address,
+      balance: parseFloat(result.rows[0].balance),
+    };
+  } catch (error) {
+    return reply.status(500).send({ error: 'Internal server error' });
+  }
+});
+
 async function bootstrap() {
   console.log('Bootstrapping...');
   const databaseUrl = process.env.DATABASE_URL;
@@ -83,6 +108,8 @@ async function bootstrap() {
   const pool = new Pool({
     connectionString: databaseUrl,
   });
+
+  fastify.decorate('pool', pool);
 
   await createTables(pool);
   await seedPostgres(pool);
