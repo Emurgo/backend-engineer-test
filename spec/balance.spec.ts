@@ -1,6 +1,6 @@
 import { test, expect } from 'bun:test';
 
-const url = 'http://localhost:3000/balance';
+const url = 'http://localhost:3000/api/balance';
 
 test('test GET /balance/:address API with seeded data', async () => {
   const seededBalance = {
